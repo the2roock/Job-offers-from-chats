@@ -69,6 +69,38 @@ def remove_keyword(user_id, value):
         connection.commit()
 
 
+def get_un_keywords(user_id=None):
+    with db_cursor() as cursor:
+        if user_id is None:
+            sql_query = 'select * from unkeyword where user_id in (select id from user where status=1)'
+        else:
+            sql_query = f'select * from unkeyword where user_id = {user_id}'
+        if not cursor.execute(sql_query):
+            return
+        keywords = [{'id': element[2], 'user_id': element[3], 'title': element[0], 'title_lowercase': element[1]} for element in cursor.fetchall()]
+        return keywords
+
+
+def add_un_keyword(user_id, value):
+    with db_connection() as connection:
+        with connection.cursor() as cursor:
+            sql_query = f'select exists(select * from unkeyword where title_lowercase=\'{value.lower()}\' and user_id={user_id})'
+            cursor.execute(sql_query)
+            if cursor.fetchone()[0] == 1:
+                return
+            sql_query = f'insert into unkeyword(user_id, title, title_lowercase) values ({user_id}, \'{value}\', \'{value.lower()}\')'
+            cursor.execute(sql_query)
+        connection.commit()
+
+
+def remove_un_keyword(user_id, value):
+    with db_connection() as connection:
+        with connection.cursor() as cursor:
+            sql_query = f'delete from unkeyword where user_id={user_id} and title_lowercase=\'{value.lower()}\''
+            cursor.execute(sql_query)
+        connection.commit()
+
+
 def add_filter(name, chat_id):
     with db_connection() as connection:
         with connection.cursor() as cursor:

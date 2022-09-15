@@ -17,11 +17,18 @@ storage = MemoryStorage()
 bot = Bot(token=Config.bot_config_token)
 dp = Dispatcher(bot, storage=storage)
 
+
 class AddKeywordStates(StatesGroup):
     waiting_for_keyword = State()
 
 class RemoveKeywordStates(StatesGroup):
     waiting_for_keyword = State()
+
+class AddUnKeywordStates(StatesGroup):
+    waiting_for_un_keyword = State()
+
+class RemoveUnKeywordStates(StatesGroup):
+    waiting_for_un_keyword = State()
 
 class AddChatStates(StatesGroup):
     waiting_for_link = State()
@@ -62,6 +69,19 @@ async def show_keywords(message):
         await message.answer(text=message_answer_text, parse_mode='MarkDown')
 
 
+# /show_un_keywords
+@dp.message_handler(commands=['show_un_keywords'])
+async def show_un_keywords(message):
+    keywords = db_functions.get_un_keywords(user_id=db_functions.get_user_id(chat_id=message.from_user.id))
+    if not keywords:
+        await message.answer('No unkeywords is set. Use /add_un_keyword.')
+    else:
+        message_answer_text = ''
+        for keyword in keywords:
+            message_answer_text += f'`{keyword["title"]}`\n'
+        await message.answer(text=message_answer_text, parse_mode='MarkDown')
+
+
 # /add_keyword
 @dp.message_handler(commands=['add_keyword'])
 async def add_keyword_start(message):
@@ -93,18 +113,50 @@ async def remove_keyword_finish(message, state):
     await message.answer('Success', reply_markup=types.ReplyKeyboardRemove())
 
 
-# /add_chat
-@dp.message_handler(commands=['add_chat'])
-async def add_chat_enter_link(message):
-    await message.answer('Enter chat link')
-    await AddChatStates.waiting_for_link.set()
+# /add_un_keyword
+@dp.message_handler(commands=['add_un_keyword'])
+async def add_un_keyword_start(message):
+    await message.answer('Enter keyword')
+    await AddUnKeywordStates.waiting_for_un_keyword.set()
 
-
-@dp.message_handler(state=AddChatStates.waiting_for_link)
-async def add_chat_finish(message, state):
-    db_functions.add_chat(message.text)
-    await message.answer('Success')
+@dp.message_handler(state=AddUnKeywordStates.waiting_for_un_keyword)
+async def add_un_keyword_finish(message, state):
+    db_functions.add_un_keyword(user_id=db_functions.get_user_id(chat_id=message.from_user.id), value=message.text)
     await state.finish()
+    await message.answer('Success', reply_markup=types.ReplyKeyboardRemove())
+
+
+# /remove_un_keyword
+@dp.message_handler(commands=['remove_un_keyword'])
+async def remove_un_keyword_start(message):
+    await show_un_keywords(message)
+    keywords = db_functions.get_un_keywords(user_id=db_functions.get_user_id(chat_id=message.from_user.id))
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    for keyword in keywords:
+        keyboard.add(keyword['title'])
+    await message.answer('Select keyword', reply_markup=keyboard)
+    await RemoveUnKeywordStates.waiting_for_un_keyword.set()
+
+
+@dp.message_handler(state=RemoveUnKeywordStates.waiting_for_un_keyword)
+async def remove_un_keyword_finish(message, state):
+    db_functions.remove_un_keyword(user_id=db_functions.get_user_id(chat_id=message.from_user.id), value=message.text)
+    await state.finish()
+    await message.answer('Success', reply_markup=types.ReplyKeyboardRemove())
+
+
+# /add_chat
+# @dp.message_handler(commands=['add_chat'])
+# async def add_chat_enter_link(message):
+#     await message.answer('Enter chat link')
+#     await AddChatStates.waiting_for_link.set()
+
+
+# @dp.message_handler(state=AddChatStates.waiting_for_link)
+# async def add_chat_finish(message, state):
+#     db_functions.add_chat(message.text)
+#     await message.answer('Success')
+#     await state.finish()
 
 
 
@@ -145,12 +197,12 @@ def send_message(text, chat_id):
 
 def main():
     Process(target=run_bot_config).start()
-    while True:
-        process = Process(target=run_scraper, args=([element[0] for element in db_functions.get_chats()],))
-        process.start()
-        sleep(300)
-        process.kill()
-    # run_scraper([element[0] for element in db_functions.get_chats()])
+    # while True:
+    #     process = Process(target=run_scraper, args=([element[0] for element in db_functions.get_chats()],))
+    #     process.start()
+    #     sleep(300)
+    #     process.kill()
+    run_scraper([element[0] for element in db_functions.get_chats()])
 
 if __name__ == '__main__':
     # run_scraper([])
